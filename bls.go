@@ -14,6 +14,7 @@ package bls
 import (
 	"crypto/sha256"
 	"errors"
+	"fmt"
 	"math/big"
 	"unsafe"
 )
@@ -558,4 +559,32 @@ func (key PublicKey) Free() {
 // after calling this function.
 func (secret PrivateKey) Free() {
 	secret.x.Free()
+}
+
+func (signature Signature) GetSignatureString() string {
+	signByte := make([]byte, 64)
+	C.element_to_bytes((*C.uchar)(unsafe.Pointer(&signByte[0])), signature.get)
+	signInt := new(big.Int).SetBytes(signByte)
+	signStr := fmt.Sprintf("%x", signInt)
+
+	//fnb := []byte("sign")
+	//modeb := []byte("w")
+	//filename := (*C.char)(unsafe.Pointer(&fnb[0]))
+	//mode := (*C.char)(unsafe.Pointer(&modeb[0]))
+	//file := C.fopen(filename, mode)
+	//C.element_out_str(file, 16, signature.get)
+	//C.fclose(file)
+
+	return signStr
+}
+
+func SignatureFromString(pairing Pairing, signStr string) Signature {
+	signInt, _ := new(big.Int).SetString(signStr, 16)
+	signByte := signInt.Bytes()
+
+	signEle := (*C.struct_element_s)(C.malloc(sizeOfElement))
+	C.element_init_G1(signEle, pairing.get)
+	C.element_from_bytes(signEle, (*C.uchar)(unsafe.Pointer(&signByte[0])))
+	sign := Signature{signEle}
+	return sign
 }
