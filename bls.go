@@ -15,7 +15,9 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"log"
 	"math/big"
+	"strings"
 	"unsafe"
 )
 
@@ -587,4 +589,139 @@ func SignatureFromString(pairing Pairing, signStr string) Signature {
 	C.element_from_bytes(signEle, (*C.uchar)(unsafe.Pointer(&signByte[0])))
 	sign := Signature{signEle}
 	return sign
+}
+
+func (sys System) GetSystemString() string {
+	sysByte := sys.ToBytes()
+	sysInt := new(big.Int).SetBytes(sysByte)
+	sysStr := fmt.Sprintf("%x", sysInt)
+	return sysStr
+}
+
+func SystemFromString(pairing Pairing, sysStr string) System {
+	SysInt, suc := new(big.Int).SetString(sysStr, 16)
+	if !suc {
+		log.Println("string of system to big int failed")
+	}
+	SysByte := SysInt.Bytes()
+	system, err := SystemFromBytes(pairing, SysByte)
+	if err != nil {
+		log.Println("system bytes to system failed: " + err.Error())
+	}
+	return system
+}
+
+func (params Params) GetParamsString() string {
+	paramsByte, err := params.ToBytes()
+	if err != nil {
+		log.Println("params to bytes failed: " + err.Error())
+	}
+	paramsInt := new(big.Int).SetBytes(paramsByte)
+	paramsStr := fmt.Sprintf("%x", paramsInt)
+	return paramsStr
+}
+
+func ParamsFromString(paramsStr string) Params {
+	paramsInt, suc := new(big.Int).SetString(paramsStr, 16)
+	if !suc {
+		log.Println("string of params to big int failed")
+	}
+	paramsByte := paramsInt.Bytes()
+	params, err := ParamsFromBytes(paramsByte)
+	if err != nil {
+		log.Println("params byte to params failed: " + err.Error())
+	}
+	return params
+}
+
+func (pk PublicKey) GetPKString() string {
+	sysStr := pk.system.GetSystemString()
+	eleStr := pk.gx.GetPKElementString()
+	return sysStr + "|" + eleStr
+}
+
+func (ele Element) GetPKElementString() string {
+	eleByte := make([]byte, 128)
+	C.element_to_bytes((*C.uchar)(unsafe.Pointer(&eleByte[0])), ele.get)
+	signInt := new(big.Int).SetBytes(eleByte)
+	signStr := fmt.Sprintf("%x", signInt)
+	return signStr
+}
+
+func PKFromString(PKString string, pairing Pairing) PublicKey {
+	elems := strings.Split(PKString, "|")
+	sysStr := elems[0]
+	eleStr := elems[1]
+	system := SystemFromString(pairing, sysStr)
+	ele := PKElementFormString(pairing, eleStr)
+	PK := PublicKey{system, ele}
+	return PK
+}
+
+func PKElementFormString(pairing Pairing, eleStr string) Element {
+	eleInt, _ := new(big.Int).SetString(eleStr, 16)
+	eleByte := eleInt.Bytes()
+
+	eleC := (*C.struct_element_s)(C.malloc(sizeOfElement))
+	C.element_init_G2(eleC, pairing.get)
+	C.element_from_bytes(eleC, (*C.uchar)(unsafe.Pointer(&eleByte[0])))
+	ele := Element{eleC}
+	return ele
+}
+
+func (sk PrivateKey) GetSKString() string {
+	sysStr := sk.system.GetSystemString()
+	eleStr := sk.x.GetSKElementString()
+	return sysStr + "|" + eleStr
+}
+
+func (ele Element) GetSKElementString() string {
+	eleByte := make([]byte, 32)
+	C.element_to_bytes((*C.uchar)(unsafe.Pointer(&eleByte[0])), ele.get)
+	signInt := new(big.Int).SetBytes(eleByte)
+	signStr := fmt.Sprintf("%x", signInt)
+
+	//fnb := []byte("sign")
+	//modeb := []byte("wr")
+	//filename := (*C.char)(unsafe.Pointer(&fnb[0]))
+	//mode := (*C.char)(unsafe.Pointer(&modeb[0]))
+	//file := C.fopen(filename, mode)
+	//C.element_out_str(file, 16, ele.get)
+	//C.fclose(file)
+
+	return signStr
+}
+
+func SKFromString(SKString string, pairing Pairing) PrivateKey {
+	elems := strings.Split(SKString, "|")
+	sysStr := elems[0]
+	eleStr := elems[1]
+	system := SystemFromString(pairing, sysStr)
+	ele := SKElementFormString(pairing, eleStr)
+	SK := PrivateKey{system, ele}
+	return SK
+}
+
+func SKElementFormString(pairing Pairing, eleStr string) Element {
+	eleInt, _ := new(big.Int).SetString(eleStr, 16)
+	eleByte := eleInt.Bytes()
+
+	eleC := (*C.struct_element_s)(C.malloc(sizeOfElement))
+	C.element_init_GT(eleC, pairing.get)
+	C.element_from_bytes(eleC, (*C.uchar)(unsafe.Pointer(&eleByte[0])))
+	ele := Element{eleC}
+
+	//fnb := []byte("sign")
+	//modeb := []byte("wr")
+	//filename := (*C.char)(unsafe.Pointer(&fnb[0]))
+	//mode := (*C.char)(unsafe.Pointer(&modeb[0]))
+	//file := C.fopen(filename, mode)
+	//eleStr1 := (*C.char)(C.malloc(C.size_t(64)))
+	//C.fgets(eleStr1, 64, file)
+
+	//eleC := (*C.struct_element_s)(C.malloc(sizeOfElement))
+	//C.element_set_str(eleC, eleStr1, 16)
+	//C.fclose(file)
+	//ele := Element{eleC}
+	return ele
 }
